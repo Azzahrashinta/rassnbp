@@ -226,14 +226,14 @@ if submit:
 
         # Membentuk dataframe input
         input_data = pd.DataFrame([{
-            "semester_1": semester_1,
-            "semester_2": semester_2,
-            "semester_3": semester_3,
-            "semester_4": semester_4,
-            "semester_5": semester_5,
+            "semester_1": nilai_rapor_semester_1',
+            "semester_2": nilai_rapor_semester_2,
+            "semester_3": nilai_rapor_semester_3,
+            "semester_4": nilai_rapor_semester_4,
+            "semester_5": nilai_rapor_semester_5,
             "peringkat_eligible": peringkat_eligible,
-            "jumlah_eligible": jumlah_eligible,
-            "jurusan_sekolah": jurusan_sekolah,
+            "jumlah_eligible": jumlah_siswa_eligible',
+            "jurusan_sekolah": peminatan,
             "jurusan_1": jurusan_1,
             "universitas_1": universitas_1,
             "linearitas_1": linearitas_1,
