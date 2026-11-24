@@ -1,96 +1,107 @@
-from pathlib import Path
+f"Daya tampung acuan: {selected_program['daya_tampung_tahun_ini']} · "
+            f"Akreditasi: {selected_program['akreditasi_prodi']}"
+        )
+        return selected_program, 1 if linearity_label == "LINIER" else 0
 
-import joblib
-import numpy as np
-import pandas as pd
-import streamlit as st
+    choice_1, linearity_1 = program_selector(1)
+    st.divider()
+    choice_2, linearity_2 = program_selector(2)
 
-
-# ============================================================
-# 1. KONFIGURASI
-# ============================================================
-
-st.set_page_config(
-    page_title="Prediksi SNBP",
-    page_icon="🎓",
-    layout="wide",
-)
-
-BASE_DIR = Path(__file__).resolve().parent
-MODEL_FILE = BASE_DIR / "xgboost.pkl"
-DATASET_FILE = BASE_DIR / "dataset_pasangan.parquet"
-MASTER_FILE = BASE_DIR / "DATA MASTER_SNBP 2023-2026.xlsx"
-MASTER_SHEET = "Data SNBP"
-
-# Daftar fitur mengikuti 37 fitur yang digunakan pada model XGBoost.
-FEATURE_COLUMNS = [
-    "nilai_rapor_semester_1",
-    "nilai_rapor_semester_2",
-    "nilai_rapor_semester_3",
-    "nilai_rapor_semester_4",
-    "nilai_rapor_semester_5",
-    "rata_rata_rapor",
-    "tren_rapor",
-    "peminatan",
-    "jumlah_siswa_eligible",
-    "posisi_relatif_eligible",
-    "skor_z_rapor_dalam_sekolah",
-    "jumlah_pemilih_prodi_sama",
-    "jumlah_pemilih_ptn_sama",
-    "peringkat_di_antara_pemilih_prodi_sama",
-    "daya_tampung_tahun_ini",
-    "daya_tampung_tahun_lalu",
-    "keketatan_tahun_lalu",
-    "tren_keketatan",
-    "kelompok_prodi",
-    "jenjang_prodi",
-    "akreditasi_prodi",
-    "wajib_portofolio",
-    "prodi_baru",
-    "nama_ptn",
-    "provinsi_ptn",
-    "kelinieran_jurusan",
-    "kesesuaian_peminatan_kelompok_prodi",
-    "ptn_satu_provinsi_dengan_sekolah",
-    "akreditasi_sekolah",
-    "jenis_sekolah",
-    "provinsi_sekolah",
-    "persentil_prestasi_sekolah",
-    "rata_rata_rapor_sekolah_tahun_lalu",
-    "simpangan_baku_rapor_sekolah_tahun_lalu",
-    "proporsi_diterima_sekolah_tahun_lalu",
-    "data_sekolah_tahun_lalu_tersedia",
-    "urutan_pilihan",
-]
-
-SCHOOL_COLUMNS = [
-    "akreditasi_sekolah",
-    "jenis_sekolah",
-    "provinsi_sekolah",
-    "persentil_prestasi_sekolah",
-    "rata_rata_rapor_sekolah_tahun_lalu",
-    "simpangan_baku_rapor_sekolah_tahun_lalu",
-    "proporsi_diterima_sekolah_tahun_lalu",
-    "data_sekolah_tahun_lalu_tersedia",
-    "jumlah_siswa_eligible",
-]
+    submitted = st.form_submit_button(
+        "🔍 Hitung Prediksi", use_container_width=True
+    )
 
 
 # ============================================================
-# 2. MEMUAT MODEL DAN DATA
+# 5. MEMBENTUK FITUR DAN MELAKUKAN PREDIKSI
 # ============================================================
 
-@st.cache_resource
-def load_model(path_string):
-    return joblib.load(path_string)
+if submitted:
+    if int(eligible_rank) > int(eligible_total):
+        st.error("Peringkat eligible tidak boleh lebih besar dari jumlah siswa eligible.")
+        st.stop()
 
+    if int(choice_1["kode_prodi"]) == int(choice_2["kode_prodi"]):
+        st.error("Pilihan 1 dan pilihan 2 tidak boleh menggunakan program studi yang sama.")
+        st.stop()
 
-@st.cache_data
+    if not np.isfinite(np.asarray(scores, dtype=float)).all():
+        st.error("Nilai rapor harus berupa angka yang valid.")
+        st.stop()
 
-def load_dataset(path_string):
-    data = pd.read_parquet(path_string)
-    required = {
-        "nama_siswa", "kode_sekolah", "tahun_angkatan", "peran_data",
-        "diterima", "jumlah_siswa_eligible", "peminatan",
-        *SCHOOL_COLUMNS,
-    }
+    try:
+        rows = []
+        for order, (program, linearity) in enumerate(
+            [(choice_1, linearity_1), (choice_2, linearity_2)], start=1
+        ):
+            rows.append(
+                build_choice_row(
+                    scores=scores,
+                    specialization=specialization,
+                    eligible_rank=int(eligible_rank),
+                    eligible_total=int(eligible_total),
+                    school_record=school_record,
+                    program_record=program,
+                    linearity=linearity,
+                    choice_order=order,
+                    target_year=int(target_year),
+                    school_reference_year=int(school_reference_year),
+                )
+            )
+
+        input_data = pd.DataFrame(rows).reindex(columns=FEATURE_COLUMNS)
+
+        # Validasi akhir: seluruh 37 fitur harus terbentuk.
+        if input_data.shape[1] != 37 or list(input_data.columns) != FEATURE_COLUMNS:
+            raise ValueError("Struktur fitur input tidak sesuai dengan 37 fitur model.")
+
+        probabilities = get_positive_probability(model, input_data)
+
+        st.success("Prediksi berhasil dihitung.")
+        st.header("4. Hasil prediksi")
+        result_cols = st.columns(2)
+        choices = [choice_1, choice_2]
+        for index, (column, program, probability) in enumerate(
+            zip(result_cols, choices, probabilities), start=1
+        ):
+            with column:
+                st.subheader(f"Pilihan {index}")
+                st.markdown(f"**{program['nama_prodi']}**")
+                st.write(program["nama_ptn"])
+                st.metric("Probabilitas prediksi diterima", f"{probability * 100:.2f}%")
+                st.progress(float(np.clip(probability, 0, 1)))
+                st.caption(
+                    f"{program['jenjang_prodi']} · {program['kelompok_prodi']} · "
+                    f"Provinsi {program['provinsi_ptn']}"
+                )
+
+        st.warning(
+            "Interpretasi fitur yang belum tersedia: skor_z_rapor_dalam_sekolah, "
+            "jumlah_pemilih_prodi_sama, jumlah_pemilih_ptn_sama, dan "
+            "peringkat_di_antara_pemilih_prodi_sama tidak dapat dihitung secara tepat "
+            "hanya dari dataset_pasangan.parquet. Nilainya dikirim sebagai missing value "
+            "dan ditangani oleh imputer di dalam pipeline model. Untuk mengisinya secara "
+            "tepat dibutuhkan tabel seluruh siswa eligible beserta seluruh pilihan mereka "
+            "pada angkatan target."
+        )
+
+        if int(target_year) == 2027:
+            st.info(
+                "Untuk target 2027, master 2026 digunakan sebagai data daya tampung terbaru. "
+                "Fitur statistik sekolah tahun sebelumnya ditandai tidak tersedia karena "
+                "dataset yang disediakan belum memuat rekap lengkap angkatan 2026."
+            )
+
+        with st.expander("Lihat 37 fitur yang dikirim ke model"):
+            display_data = input_data.copy().T
+            display_data.columns = ["Pilihan 1", "Pilihan 2"]
+            st.dataframe(display_data, use_container_width=True)
+
+        st.caption(
+            "Probabilitas merupakan estimasi model berdasarkan pola data historis, "
+            "bukan jaminan diterima SNBP."
+        )
+
+    except Exception as error:
+        st.error(f"Terjadi kesalahan saat prediksi: {error}")
+        st.exception(error)
