@@ -591,7 +591,7 @@ st.caption(
     f"{program_metadata['jumlah_universitas']:,} universitas. "
     "Metadata menggunakan catatan terbaru yang tersedia "
     "untuk setiap program studi."
-
+)
 st.caption(
     f"Daftar pilihan menggabungkan data master tahun {', '.join(map(str, program_metadata['tahun_metadata']))}. "
     f"Tersedia {program_metadata['jumlah_program_studi']:,} program studi dari "
