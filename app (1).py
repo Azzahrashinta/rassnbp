@@ -392,56 +392,70 @@ def build_choice_row(
 
 def get_positive_probability(model, input_data):
 
-    if not hasattr(model, "predict_proba"):
-        raise TypeError(
-            "Model tidak memiliki method predict_proba()."
+    st.subheader("Diagnostik fitur model")
+
+    st.write("Jumlah fitur input aplikasi:", input_data.shape[1])
+
+    # Periksa pipeline
+    if hasattr(model, "named_steps"):
+
+        st.write(
+            "Tahapan pipeline:",
+            list(model.named_steps.keys())
         )
 
-    expected = getattr(model, "feature_names_in_", None)
+        # Ambil estimator terakhir
+        final_estimator = model.steps[-1][1]
 
-    if expected is None:
-        st.error(
-            "Model tidak menyediakan feature_names_in_. "
-            "Perlu memeriksa pipeline atau booster XGBoost."
+        st.write(
+            "Jumlah fitur yang diterima estimator akhir:",
+            getattr(final_estimator, "n_features_in_", "Tidak tersedia")
         )
 
-        if hasattr(model, "named_steps"):
-            st.write("Tahapan pipeline:", list(model.named_steps.keys()))
+        # Ambil nama fitur hasil preprocessing
+        if hasattr(model, "get_feature_names_out"):
+            try:
+                transformed_names = model[:-1].get_feature_names_out()
 
-            final_estimator = model.steps[-1][1]
-
-            if hasattr(final_estimator, "get_booster"):
                 st.write(
-                    "Nama fitur booster:",
-                    final_estimator.get_booster().feature_names
+                    "Jumlah fitur setelah preprocessing:",
+                    len(transformed_names)
                 )
 
-        st.stop()
+                st.write("Nama fitur setelah preprocessing:")
+                st.code("\n".join(map(str, transformed_names)))
 
-    expected = list(expected)
-    actual = list(input_data.columns)
+            except Exception as error:
+                st.warning(
+                    f"Nama fitur hasil preprocessing tidak dapat diambil: {error}"
+                )
 
-    missing = [f for f in expected if f not in actual]
-    extra = [f for f in actual if f not in expected]
+    # Periksa fitur input mentah yang diharapkan pipeline
+    expected = getattr(model, "feature_names_in_", None)
 
-    if missing or extra:
-        st.error("Fitur model dan aplikasi tidak cocok.")
+    if expected is not None:
 
-        st.write("Jumlah fitur model:", len(expected))
-        st.write("Jumlah fitur aplikasi:", len(actual))
+        expected = list(expected)
+        actual = list(input_data.columns)
 
-        st.write("**Daftar fitur model:**")
-        st.code("\n".join(expected))
+        missing = [f for f in expected if f not in actual]
+        extra = [f for f in actual if f not in expected]
 
-        st.write("**Fitur yang belum tersedia di aplikasi:**")
-        st.code("\n".join(missing) if missing else "Tidak ada")
+        st.write("Jumlah fitur input yang diharapkan pipeline:", len(expected))
 
-        st.write("**Fitur tambahan di aplikasi:**")
-        st.code("\n".join(extra) if extra else "Tidak ada")
+        if missing or extra:
 
-        st.stop()
+            st.error("Nama fitur input aplikasi tidak cocok dengan pipeline.")
 
-    input_data = input_data[expected]
+            st.write("Fitur yang kurang:")
+            st.code("\n".join(missing) if missing else "Tidak ada")
+
+            st.write("Fitur tambahan:")
+            st.code("\n".join(extra) if extra else "Tidak ada")
+
+            st.stop()
+
+        input_data = input_data[expected]
 
     probabilities = model.predict_proba(input_data)
 
