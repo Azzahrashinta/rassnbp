@@ -521,77 +521,6 @@ try:
 except Exception as error:
     st.error(f"Gagal menyiapkan referensi program studi: {error}")
     st.stop()
-# ============================================================
-# DIAGNOSTIK DATA MASTER
-# ============================================================
-
-with st.expander("🔎 Diagnostik Data Master", expanded=True):
-
-    st.write("### 1. Data Excel")
-
-    st.write({
-        "Jumlah baris master": len(master),
-        "Jumlah kode prodi unik": master["Kode Prodi"].nunique(),
-        "Tahun tersedia": sorted(
-            master["Tahun"].dropna().astype(int).unique().tolist()
-        ),
-    })
-
-    st.write("### 2. Referensi Program Studi")
-
-    st.write({
-        "Jumlah baris referensi": len(program_reference),
-        "Jumlah kode prodi unik": program_reference["kode_prodi"].nunique(),
-        "Jumlah universitas": program_reference["nama_ptn"].nunique(),
-    })
-
-    st.write("### 3. Jumlah Prodi per Universitas")
-
-    university_counts = (
-        program_reference
-        .groupby("nama_ptn")
-        .agg(jumlah_prodi=("kode_prodi", "nunique"))
-        .sort_values("jumlah_prodi", ascending=False)
-        .reset_index()
-    )
-
-    st.dataframe(
-        university_counts,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.write("### 4. Jumlah Prodi per Tahun")
-
-    yearly_counts = (
-        master.groupby("Tahun")
-        .agg(
-            jumlah_baris=("Kode Prodi", "size"),
-            jumlah_prodi=("Kode Prodi", "nunique")
-        )
-        .reset_index()
-    )
-
-    st.dataframe(
-        yearly_counts,
-        use_container_width=True,
-        hide_index=True
-    )
-
-
-# ============================================================
-# INFORMASI REFERENSI
-# ============================================================
-
-st.caption(
-    f"Daftar pilihan menggabungkan data master tahun "
-    f"{', '.join(map(str, program_metadata['tahun_metadata']))}. "
-    f"Tersedia {program_metadata['jumlah_program_studi']:,} "
-    f"program studi dari "
-    f"{program_metadata['jumlah_universitas']:,} universitas. "
-    "Metadata menggunakan catatan terbaru yang tersedia "
-    "untuk setiap program studi."
-)
 st.caption(
     f"Daftar pilihan menggabungkan data master tahun {', '.join(map(str, program_metadata['tahun_metadata']))}. "
     f"Tersedia {program_metadata['jumlah_program_studi']:,} program studi dari "
@@ -686,31 +615,12 @@ with st.form("form_prediksi_snbp"):
             options=universities,
             key=f"university_{choice_number}",
         )
-        #candidates = program_reference[
-            #program_reference["nama_ptn"] == selected_university
-        #].sort_values(["nama_prodi", "jenjang_prodi"])
+        candidates = program_reference[
+            program_reference["nama_ptn"] == selected_university
+        ].sort_values(["nama_prodi", "jenjang_prodi"])
         candidates = program_reference[
             program_reference["nama_ptn"] == selected_university
         ].copy()
-        
-        # Diagnostik sebelum penghapusan duplikasi
-        jumlah_sebelum = len(candidates)
-        
-        candidates = candidates.sort_values(
-            ["nama_prodi", "jenjang_prodi"]
-        )
-        
-        candidates = candidates.drop_duplicates(
-            "kode_prodi"
-        )
-        
-        jumlah_sesudah = len(candidates)
-        
-        st.caption(
-            f"Diagnostik pilihan {choice_number}: "
-            f"{jumlah_sebelum} data ditemukan, "
-            f"{jumlah_sesudah} prodi unik ditampilkan."
-        )
         candidates = candidates.drop_duplicates("kode_prodi")
         program_codes = candidates["kode_prodi"].tolist()
         selected_code = st.selectbox(
