@@ -686,9 +686,31 @@ with st.form("form_prediksi_snbp"):
             options=universities,
             key=f"university_{choice_number}",
         )
+        #candidates = program_reference[
+            #program_reference["nama_ptn"] == selected_university
+        #].sort_values(["nama_prodi", "jenjang_prodi"])
         candidates = program_reference[
             program_reference["nama_ptn"] == selected_university
-        ].sort_values(["nama_prodi", "jenjang_prodi"])
+        ].copy()
+        
+        # Diagnostik sebelum penghapusan duplikasi
+        jumlah_sebelum = len(candidates)
+        
+        candidates = candidates.sort_values(
+            ["nama_prodi", "jenjang_prodi"]
+        )
+        
+        candidates = candidates.drop_duplicates(
+            "kode_prodi"
+        )
+        
+        jumlah_sesudah = len(candidates)
+        
+        st.caption(
+            f"Diagnostik pilihan {choice_number}: "
+            f"{jumlah_sebelum} data ditemukan, "
+            f"{jumlah_sesudah} prodi unik ditampilkan."
+        )
         candidates = candidates.drop_duplicates("kode_prodi")
         program_codes = candidates["kode_prodi"].tolist()
         selected_code = st.selectbox(
