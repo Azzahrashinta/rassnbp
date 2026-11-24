@@ -6,3 +6,5 @@ joblib
 xgboost
 optuna
 imbalanced-learn
+pyarrow
+openpyxl
