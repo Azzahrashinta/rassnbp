@@ -32,6 +32,7 @@ FEATURE_COLUMNS = [
     "rata_rata_rapor",
     "tren_rapor",
     "peminatan",
+    "peringkat_eligible",
     "jumlah_siswa_eligible",
     "posisi_relatif_eligible",
     "skor_z_rapor_dalam_sekolah",
