@@ -9,7 +9,7 @@ import joblib
 
 @st.cache_resource
 def load_model():
-    return joblib.load("model_snbp.pkl")
+    return joblib.load("xgboost.pkl")
 
 model = load_model()
 
