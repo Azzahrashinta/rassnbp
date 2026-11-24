@@ -444,6 +444,7 @@ def get_positive_probability(model, input_frame):
     return probabilities[:, positive_index]
 
 
+
 # ============================================================
 # 3. LOAD FILE DAN TAMPILAN AWAL
 # ============================================================
@@ -454,64 +455,84 @@ st.write(
     "Aplikasi akan membentuk fitur dan menghitung probabilitas untuk setiap pilihan."
 )
 
-missing_files = [
-    file.name for file in [MODEL_FILE, DATASET_FILE, MASTER_FILE] if not file.exists()
+# Periksa seluruh file yang diperlukan
+REQUIRED_FILES = [
+    MODEL_FILE,
+    DATASET_FILE,
+    MASTER_FILE,
+    SCHOOL_MAPPING_FILE,
 ]
+
+missing_files = [
+    file.name for file in REQUIRED_FILES if not file.exists()
+]
+
 if missing_files:
     st.error(
-        "File berikut belum ditemukan di folder yang sama dengan app.py: "
+        "File berikut belum ditemukan di folder aplikasi: "
         + ", ".join(missing_files)
     )
     st.stop()
 
-try:
-    model = load_model(str(MODEL_FILE))
-    if not hasattr(model, "named_steps"):
-        raise TypeError(
-            "xgboost.pkl harus berisi pipeline lengkap (preprocessor + sampler + model), "
-            "bukan XGBClassifier mentah. Simpan objek pipeline hasil fit dari training."
-        )
-    dataset = load_dataset(str(DATASET_FILE))
-    master_raw = load_master(str(MASTER_FILE), MASTER_SHEET)
-    master = prepare_master(master_raw)
-    school_reference = build_school_reference(dataset)
-    school_mapping = load_school_mapping(str(SCHOOL_MAPPING_FILE))
-except Exception as error:
-    st.error(f"Gagal memuat model atau data: {error}")
-    st.stop()
 
-# Pastikan urutan 38 fitur aplikasi sama dengan fitur mentah yang diharapkan model.
-model_feature_names = getattr(model, "feature_names_in_", None)
-if model_feature_names is not None:
-    model_feature_names = list(model_feature_names)
-    if model_feature_names != FEATURE_COLUMNS:
-        st.error(
-            "Urutan/nama fitur aplikasi belum sama dengan fitur input model. "
-            f"Model: {len(model_feature_names)} fitur; aplikasi: {len(FEATURE_COLUMNS)} fitur."
+# Tampilkan tahapan pemuatan supaya diketahui bagian yang lambat
+with st.status("Menyiapkan aplikasi prediksi SNBP...", expanded=True) as status:
+
+    try:
+        st.write("1/4 Memuat model XGBoost...")
+        model = load_model(str(MODEL_FILE))
+        
+        if not hasattr(model, "named_steps"):
+            raise TypeError(
+                "Model harus berupa pipeline lengkap "
+                "(preprocessor + sampler + classifier)."
+            )
+
+        st.write("2/4 Memuat dataset pasangan...")
+        dataset = load_dataset(str(DATASET_FILE))
+
+        st.write("3/4 Memuat master program studi...")
+        master_raw = load_master(str(MASTER_FILE), MASTER_SHEET)
+        master = prepare_master(master_raw)
+
+        st.write("4/4 Memuat pemetaan sekolah...")
+        school_mapping = load_school_mapping(
+            str(SCHOOL_MAPPING_FILE)
         )
-        st.write("Fitur model:", model_feature_names)
-        st.write("Fitur aplikasi:", FEATURE_COLUMNS)
+
+        school_reference = build_school_reference(dataset)
+
+        # Validasi fitur model
+        model_feature_names = getattr(
+            model, "feature_names_in_", None
+        )
+
+        if model_feature_names is not None:
+            model_feature_names = list(model_feature_names)
+
+            if model_feature_names != FEATURE_COLUMNS:
+                raise ValueError(
+                    f"Fitur model ({len(model_feature_names)}) "
+                    f"tidak sama dengan fitur aplikasi "
+                    f"({len(FEATURE_COLUMNS)})."
+                )
+
+        status.update(
+            label="Aplikasi berhasil disiapkan!",
+            state="complete",
+            expanded=False
+        )
+
+    except Exception as error:
+        status.update(
+            label="Gagal menyiapkan aplikasi",
+            state="error",
+            expanded=True
+        )
+        st.error(f"Detail kesalahan: {error}")
+        st.exception(error)
         st.stop()
 
-# Tahun 2027 memakai master 2026 sebagai data terbaru yang tersedia.
-target_year = st.selectbox(
-    "Tahun SNBP yang diprediksi",
-    options=[2027, 2026],
-    index=0,
-    help="Untuk 2027, master 2026 digunakan sebagai data daya tampung terbaru yang tersedia.",
-)
-
-try:
-    program_reference, program_metadata = make_program_reference(master, int(target_year))
-except Exception as error:
-    st.error(f"Gagal menyiapkan referensi program studi: {error}")
-    st.stop()
-
-st.caption(
-    f"Data prodi menggunakan daya tampung tahun {program_metadata['capacity_year']} "
-    f"dan keketatan tahun {program_metadata['keketatan_year']}. "
-    "Untuk target 2027, program studi baru yang belum ada di master 2026 belum dapat dipilih."
-)
 
 
 # ============================================================
