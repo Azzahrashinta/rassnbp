@@ -518,6 +518,9 @@ target_year = st.selectbox(
 
 try:
     program_reference, program_metadata = make_program_reference(master, int(target_year))
+except Exception as error:
+    st.error(f"Gagal menyiapkan referensi program studi: {error}")
+    st.stop()
 # ============================================================
 # DIAGNOSTIK DATA MASTER
 # ============================================================
@@ -569,9 +572,6 @@ with st.expander("🔎 Diagnostik Data Master", expanded=True):
             jumlah_prodi=("Kode Prodi", "nunique")
         )
     )
-except Exception as error:
-    st.error(f"Gagal menyiapkan referensi program studi: {error}")
-    st.stop()
 
 st.caption(
     f"Daftar pilihan menggabungkan data master tahun {', '.join(map(str, program_metadata['tahun_metadata']))}. "
