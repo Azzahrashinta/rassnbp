@@ -390,31 +390,67 @@ def build_choice_row(
     return row
 
 
-def get_positive_probability(model, input_frame):
-    """Mengambil probabilitas kelas 1 dari pipeline/model yang disimpan."""
+def get_positive_probability(model, input_data):
+
     if not hasattr(model, "predict_proba"):
-        raise TypeError("Objek xgboost.pkl tidak memiliki method predict_proba().")
+        raise TypeError(
+            "Model tidak memiliki method predict_proba()."
+        )
 
-    model_features = getattr(model, "feature_names_in_", None)
-    if model_features is not None:
-        model_features = list(model_features)
-        missing = set(model_features) - set(input_frame.columns)
-        extra = set(input_frame.columns) - set(model_features)
-        if missing or extra:
-            raise ValueError(
-                "Fitur input tidak sama dengan fitur model. "
-                f"Kurang: {sorted(missing)}; berlebih: {sorted(extra)}"
-            )
-        input_frame = input_frame.loc[:, model_features]
-    else:
-        input_frame = input_frame.loc[:, FEATURE_COLUMNS]
+    expected = getattr(model, "feature_names_in_", None)
 
-    probabilities = model.predict_proba(input_frame)
-    classes = list(getattr(model, "classes_", [0, 1]))
+    if expected is None:
+        st.error(
+            "Model tidak menyediakan feature_names_in_. "
+            "Perlu memeriksa pipeline atau booster XGBoost."
+        )
+
+        if hasattr(model, "named_steps"):
+            st.write("Tahapan pipeline:", list(model.named_steps.keys()))
+
+            final_estimator = model.steps[-1][1]
+
+            if hasattr(final_estimator, "get_booster"):
+                st.write(
+                    "Nama fitur booster:",
+                    final_estimator.get_booster().feature_names
+                )
+
+        st.stop()
+
+    expected = list(expected)
+    actual = list(input_data.columns)
+
+    missing = [f for f in expected if f not in actual]
+    extra = [f for f in actual if f not in expected]
+
+    if missing or extra:
+        st.error("Fitur model dan aplikasi tidak cocok.")
+
+        st.write("Jumlah fitur model:", len(expected))
+        st.write("Jumlah fitur aplikasi:", len(actual))
+
+        st.write("**Daftar fitur model:**")
+        st.code("\n".join(expected))
+
+        st.write("**Fitur yang belum tersedia di aplikasi:**")
+        st.code("\n".join(missing) if missing else "Tidak ada")
+
+        st.write("**Fitur tambahan di aplikasi:**")
+        st.code("\n".join(extra) if extra else "Tidak ada")
+
+        st.stop()
+
+    input_data = input_data[expected]
+
+    probabilities = model.predict_proba(input_data)
+
+    classes = list(model.classes_)
+
     if 1 not in classes:
-        raise ValueError("Model tidak memiliki kelas target 1 (diterima).")
-    positive_index = classes.index(1)
-    return probabilities[:, positive_index]
+        raise ValueError("Kelas positif 1 tidak ditemukan.")
+
+    return probabilities[:, classes.index(1)]
 
 
 # ============================================================
