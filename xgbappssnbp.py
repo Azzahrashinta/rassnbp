@@ -17,7 +17,7 @@ st.set_page_config(
 )
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_FILE = BASE_DIR / "catboost.pkl"
+MODEL_FILE = BASE_DIR / "xgboost.pkl"
 DATASET_FILE = BASE_DIR / "dataset_pasangan.parquet"
 MASTER_FILE = BASE_DIR / "DATA MASTER_SNBP 2023-2026.xlsx"
 MASTER_SHEET = "Data SNBP"
